@@ -4,10 +4,10 @@ import boto3
 import json
 
 # Set up AWS credentials
-s3 = boto3.client('s3', aws_access_key_id='xxxxx',
-                  aws_secret_access_key='xxxxx')
-sqs = boto3.resource('sqs', aws_access_key_id='xxxxx',
-                     aws_secret_access_key='xxxxx', region_name='eu-west-1')
+s3 = boto3.client('s3', aws_access_key_id='AKIA3JFAGJW44LW33YEB',
+                  aws_secret_access_key='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')
+sqs = boto3.resource('sqs', aws_access_key_id='AKIA3JFAGJW44LW33YEB',
+                     aws_secret_access_key='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', region_name='eu-west-1')
 
 # Set up ffmpeg command
 ffmpeg_cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', 'input.txt', '-c', 'copy', 'output.mp4']
@@ -22,12 +22,12 @@ queue_url = 'https://sqs.eu-west-1.amazonaws.com/775577554361/concatenate_media.
 def process_message(message, body):
     try:
         body_obj = json.loads(body)
-        bucket_match = body_obj["bucket_match"]
+        match = body_obj["match"]
         # List all the MP4 files in the directory
-        response = s3.list_objects_v2(Bucket='matches-onetoc', Prefix=bucket_match)
+        response = s3.list_objects_v2(Bucket='matches-onetoc', Prefix=match)
         input_files = [obj['Key'] for obj in response.get('Contents', []) if obj['Key'].endswith('.mp4')]
         if not input_files:
-            print(f"No .mp4 files found in {bucket_match}")
+            print(f"No .mp4 files found in {match}")
             return
         for input_file in input_files:
             print(f"Downloading... {input_file}")
@@ -36,7 +36,7 @@ def process_message(message, body):
         # Create a file list for ffmpeg to concatenate
         with open('input.txt', 'w') as f:
             for file in input_files:
-                f.write(f"file '{file.replace(bucket_match + '/', '')}'\n")
+                f.write(f"file '{file.replace(match + '/', '')}'\n")
         
         # Concatenate the input files using ffmpeg
         print('running ffmpeg command')
@@ -44,11 +44,11 @@ def process_message(message, body):
         print('finished ffmpeg command')
         # Upload the concatenated file to S3
         with open('output.mp4', 'rb') as f:
-            s3.upload_fileobj(f, 'matches-onetoc', f'{bucket_match}/output.mp4')
+            s3.upload_fileobj(f, 'matches-onetoc', f'{match}/output.mp4')
 
         print('output uploaded to s3')
         for file in input_files:
-            os.remove(f"{file.replace(bucket_match + '/', '')}")
+            os.remove(f"{file.replace(match + '/', '')}")
         # Clean up temporary files
         os.remove('output.mp4')
 
@@ -56,7 +56,7 @@ def process_message(message, body):
         message.delete()
         print('Message deleted')
     except Exception as e:
-        print(f'Error concatening media for match: {body_obj["bucket_match"]}. Error: {e}')
+        print(f'Error concatening media for match: {body_obj["match"]}. Error: {e}')
 
 # Get the SQS queue
 queue = sqs.Queue(queue_url)
