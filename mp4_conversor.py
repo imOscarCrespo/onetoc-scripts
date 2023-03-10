@@ -19,7 +19,7 @@ concatenate_media_queue_url = 'https://sqs.eu-west-1.amazonaws.com/775577554361/
 queue_url = 'https://sqs.eu-west-1.amazonaws.com/775577554361/mp4_conversor.fifo'
 
 
-def sendProgressToClient(connection_id, video_name, progress):
+def sendProgressToClient(connection_id, progress):
     input_params = {
         'connectionId': connection_id,
         'message': progress,
@@ -47,8 +47,9 @@ def get_video_frame_count(video_file_path):
 def process_message(message, body):
     # try:
         body_obj = json.loads(body)
-        match = body_obj["match"]
+        match = body_obj["matchId"]
         connection_id = body_obj["connectionId"]
+        file_extension = body_obj["fileExtension"]
         # List all the MP4 files in the directory
         response = s3.list_objects_v2(Bucket='matches-onetoc', Prefix=match)
         input_files = [obj['Key'] for obj in response.get('Contents', []) if obj['Key']]
@@ -57,13 +58,19 @@ def process_message(message, body):
             print(f"No .mp4 files found in {match}")
             return
         for input_file in input_files:
+                print('downloading...', input_file)
                 s3.download_file('matches-onetoc', input_file, os.path.basename(input_file))
         i = 0
-        input_files = ['prueba/14_0.mov', 'prueba/4_0_IMG_4397.MOV']
+        input_files_with_no_match_id = list(map(lambda x: x.replace(f'{match}/', ""), input_files))
+        input_files_with_no_extension = list(map(lambda x: x.replace(f'.{file_extension}', ""), input_files_with_no_match_id))
+        input_files_nums = list(map(int, input_files_with_no_extension))
+        sort_list_nums = input_files_nums
+        input_files_sorted = [str(item) + "." + file_extension for item in sort_list_nums]
         output_files = []
-        for input_file in input_files:
+        input_length = len(input_files_sorted)
+        for input_file in input_files_sorted:
             # frameCount = get_video_frame_count(f'/Users/oscar/code/onetoc-scripts/{input_file.replace(match + "/", "")}')
-            command = f'ffmpeg -stats -i {input_file.replace(match + "/", "")} -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k \-movflags +faststart -vf scale=-2:720,format=yuv420p "output_{i}.mp4"'
+            command = f'ffmpeg -stats -i {input_file.replace(match + "/", "")} -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k \-movflags +faststart -vf scale=-2:720,format=yuv420p "{i}.mp4"'
             process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
 
             # read and process the command output line by line
@@ -79,18 +86,19 @@ def process_message(message, body):
                     current_hours, current_minutes, current_seconds = current_time.split(":")
                     current_seconds = int(current_hours)*3600 + int(current_minutes)*60 + float(current_seconds)
                     progress = round((current_seconds/total_seconds)*100, 2)
-                    print(f"Progress: {progress}%")
-                    sendProgressToClient(connection_id, None, progress)
+                    print(f"Progress: {progress/input_length}%")
+                    sendProgressToClient(connection_id, progress/input_length)
                 output = process.stdout.readline()
 
-            output_files.append(f'output_{i}.mp4')
+            output_files.append(f'{i}.mp4')
             i += 1
-
+            input_length -= 1
             process.stdout.close()
-        
+        k=1
         for output_file in output_files:
             with open(output_file, 'rb') as f:
-                s3.upload_fileobj(f, 'matches-onetoc', f'{match}/{output_file}')
+                s3.upload_fileobj(f, 'matches-onetoc', f'{match}/{k}')
+            k += 1
 
         now = date.today()
         response = sqs_client.send_message(
@@ -100,9 +108,16 @@ def process_message(message, body):
             MessageDeduplicationId = now.strftime('%Y%m%d%H%M%S')
         )
         message.delete()
+# message_example = {
+#    "matchId": "prueba",
+# "fileExtension": "MOV",
+# "connectionId": "11"
+# }
 queue = sqs.Queue(queue_url)
 while True:
     messages = queue.receive_messages()
+    print(messages)
     for message in messages:
         # Process the message
+        print('hola')
         process_message(message, message.body)

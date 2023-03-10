@@ -29,13 +29,19 @@ def process_message(message, body):
         if not input_files:
             print(f"No .mp4 files found in {match}")
             return
+       
         for input_file in input_files:
             print(f"Downloading... {input_file}")
             s3.download_file('matches-onetoc', input_file, os.path.basename(input_file))
             print(f"Downloaded {input_file}")
+
+        input_files_with_no_extension = list(map(lambda x: x.replace(".mp4", ""), input_files))
+        input_files_nums = list(map(int, input_files_with_no_extension))
+        sort_list_nums = input_files_nums.sort()
+        input_files_sorted = [str(item) + ".mp4" for item in sort_list_nums]
         # Create a file list for ffmpeg to concatenate
         with open('input.txt', 'w') as f:
-            for file in input_files:
+            for file in input_files_sorted:
                 f.write(f"file '{file.replace(match + '/', '')}'\n")
         
         # Concatenate the input files using ffmpeg
