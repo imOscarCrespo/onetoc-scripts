@@ -26,7 +26,7 @@ queue_url = 'https://sqs.eu-west-1.amazonaws.com/775577554361/concatenate_media.
 
 def update_match_media(match):
 
-    s3_matches_url = 'https://matches-onetoc.s3.eu-west-1.amazonaws.com/'
+    s3_matches_url = 'https://matches-onetoc.s3.eu-west-1.amazonaws.com'
     auth_url = "https://api.onetoc.com/api/token/"
 
     auth_payload = json.dumps({
@@ -40,23 +40,25 @@ def update_match_media(match):
     
     auth_response = http.request("POST", auth_url, headers=auth_headers, body=auth_payload.encode('utf-8'))
     auth_res = auth_response.data.decode('utf-8')
-    url = "https://api.onetoc.com/websocket"
+    matchId = match.split('_')
+    print('MAAATCH', matchId)
+    url = f'https://api.onetoc.com/match/{matchId[1]}'
 
     payload = json.dumps({
-        "media": f'{s3_matches_url}/{match}/{match}_output.mp4'
+        "media": f'{s3_matches_url}/{match}/output.mp4'
     })
     
     headers = {
         'Authorization': f'Bearer {json.loads(auth_res)["access"]}',
         'Content-Type': 'application/json'
     }
-
+    print('hooola fent el patch')
     http.request("PATCH", url, headers=headers, body=payload.encode('utf-8'))
 
 def sendProgressToClient(connection_id):
     input_params = {
         'connectionId': connection_id,
-        'message': '100%',
+        'message': 100,
     }
     lambda_client.invoke(
         FunctionName='webhook_broadcast',
