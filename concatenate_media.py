@@ -11,7 +11,7 @@ lambda_client = boto3.client('lambda')
 
 # Set up AWS credentials
 s3 = boto3.client('s3', aws_access_key_id='AKIA3JFAGJW44LW33YEB',
-                  aws_secret_access_key='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')
+                  aws_secret_access_key='vJmj+DFlMrW6+S94XK8oDMHSwkImUg2sRKaRJJ07', region_name='eu-west-1')
 sqs = boto3.resource('sqs', aws_access_key_id='AKIA3JFAGJW44LW33YEB',
                      aws_secret_access_key='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', region_name='eu-west-1')
 
@@ -41,7 +41,6 @@ def update_match_media(match):
     auth_response = http.request("POST", auth_url, headers=auth_headers, body=auth_payload.encode('utf-8'))
     auth_res = auth_response.data.decode('utf-8')
     matchId = match.split('_')
-    print('MAAATCH', matchId)
     url = f'https://api.onetoc.com/match/{matchId[1]}'
 
     payload = json.dumps({
@@ -52,7 +51,6 @@ def update_match_media(match):
         'Authorization': f'Bearer {json.loads(auth_res)["access"]}',
         'Content-Type': 'application/json'
     }
-    print('hooola fent el patch')
     http.request("PATCH", url, headers=headers, body=payload.encode('utf-8'))
 
 def sendProgressToClient(connection_id):
@@ -70,7 +68,6 @@ def sendProgressToClient(connection_id):
 def process_message(message, body):
     try:
         body_obj = json.loads(body)
-        print('** BODY **', body_obj)
         match = body_obj["matchId"]
         connection_id = body_obj["connectionId"]
         file_extension = "mp4"
